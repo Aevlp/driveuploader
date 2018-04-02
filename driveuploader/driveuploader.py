@@ -1,12 +1,13 @@
 #!/usr/bin/env python3.5
 #####################################
-#    LAST UPDATED     14 DEC 2017   #
+#    LAST UPDATED     02 APR 2018   #
 #####################################
 """
 Once a month, zips a folder and uploads it to Google Drive
 """
 import os
 import datetime
+import argparse
 from zipfile import ZipFile
 from pydrive.drive import GoogleDrive
 from pydrive.auth import GoogleAuth
@@ -20,10 +21,13 @@ def push(title: str, body: str=None) -> None:
     :param body: Body of the message to push
 
     """
-    with open('/Users/Alex/Documents/Python3/driveuploader/pushbullet_token.txt') as files:
-        token = files.read().strip()
-    pb = PushBullet(token)
-    pb.push_note('{}'.format(title), '{}'.format(body), device=pb.get_device('iPhone'))
+    try:
+        with open('/Users/Alex/Documents/Python3/driveuploader/pushbullet_token.txt') as files:
+            token = files.read().strip()
+        pb = PushBullet(token)
+        pb.push_note('{}'.format(title), '{}'.format(body), device=pb.get_device('iPhone'))
+    except:
+        pass
 
 
 def harddrives_connected(path: str) -> bool:
@@ -51,7 +55,8 @@ def zip_folder(folder: str, path: str, zipfilename: str) -> bool:
         os.chdir(path)
 
         # create the ZIP file
-        print('Creating {}...'.format(zipfilename))
+        if debug:
+            print('Creating {}...'.format(zipfilename))
 
         backupzip = ZipFile(zipfilename, 'w', allowZip64=True)
 
@@ -90,13 +95,21 @@ def manage_google_drive(path: str, zipfilename: str, parent_folder_id: str) -> b
 
     upload_file = drive.CreateFile({'title': zipfilename,
                                    'parents': [{u'id': parent_folder_id}]})
+    if debug:
+        print('Uploading {}'.format(zipfilename))
     upload_file.SetContentFile(path)
     upload_file.Upload()
+    if debug:
+        print('Upload complete')
 
     file_list = drive.ListFile({'q': "'0B2jADZue7Al4dy0ydVVkay1TMDg' in parents and trashed=false"}).GetList()
     for file1 in file_list:
         if file1['title'] == old_filename:
+            if debug:
+                print('Deleting {}'.format(old_filename))
             file1.Delete()
+            if debug:
+                print('Deleted')
             return True
     return False
 
@@ -113,8 +126,20 @@ def main() -> None:
         zip_folder(source, destination, name)
         parent_id = '0B2jADZue7Al4dy0ydVVkay1TMDg'
         manage_google_drive(os.path.join(destination, name), name, parent_id)
+        if debug:
+            print('Cleaning up...')
         os.unlink(os.path.join(destination, name))
+        if debug:
+            print('Done!')
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-v", "--verbose", action="store_true",
+                        help="Verbosely perform backup functions")
+    args = parser.parse_args()
+    if args.verbose:
+        debug = True
+    else:
+        debug = False
     main()
